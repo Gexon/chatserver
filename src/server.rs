@@ -9,7 +9,7 @@ pub fn start() {
     for i in 0..10 {
         let tx = tx.clone();
         thread::spawn(move || {
-            tx.send(i).unwrap();    // кидает в очередь.
+            tx.send(i).unwrap();    // кидает в очередь
         });
     }
 
