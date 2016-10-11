@@ -1,29 +1,42 @@
-/// A stateful wrapper around a non-blocking stream. This connection is not
-/// the SERVER connection. This connection represents the client connections
-/// _accepted_ by the SERVER connection.
+use std::io;
+use std::io::prelude::*;
+use std::io::{Error, ErrorKind};
+use std::rc::Rc;
+
+use byteorder::{ByteOrder, BigEndian};
+
+use mio::*;
+use mio::tcp::*;
+
+/// Обертка вокруг неблокирующих сокетов.
+/// Это Connection не соединяется с Сервером.
+/// Это Connection представляет клиентские подключения,
+/// принимаемых Серверными подключениями.
 pub struct Connection {
-    // handle to the accepted socket
+    // handle подключенного сокета
     sock: TcpStream,
 
-    // token used to register with the poller
+    // токен для регистрации в опроснике событий
     pub token: Token,
 
-    // set of events we are interested in
+    // интересующий набор событий
     interest: Ready,
 
-    // messages waiting to be sent out
+    // очередь отправляемых сообщений
     send_queue: Vec<Rc<Vec<u8>>>,
 
-    // track whether a connection needs to be (re)registered
+    // отслеживать ли необходимость в перерегистрации
     is_idle: bool,
 
-    // track whether a connection is reset
+    // отслеживать ли сброс соединения
     is_reset: bool,
 
+    // отслеживать ли при чтении получение `WouldBlock`
+    // и хранит количество байт что мы должны читать.
     // track whether a read received `WouldBlock` and store the number of
     // byte we are supposed to read
     read_continuation: Option<u64>,
 
-    // track whether a write received `WouldBlock`
+    // отслеживать ли запись получил `WouldBlock`
     write_continuation: bool,
 }
