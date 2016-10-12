@@ -1,3 +1,5 @@
+// Взято отсюдо https://github.com/hjr3/mob
+
 extern crate byteorder;
 extern crate mio;
 extern crate slab;

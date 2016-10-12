@@ -90,6 +90,37 @@ impl Server {
         })
     }
 
+    // конечный такт бесконечного цикла
+    fn tick(&mut self, poll: &mut Poll) {
+        trace!("register tick");
+
+        let mut reset_tokens = Vec::new();
+
+        for c in self.conns.iter_mut() {
+            if c.is_reset() {
+                reset_tokens.push(c.token);
+            } else if c.is_idle() {
+                c.reregister(poll)
+                    .unwrap_or_else(|e| {
+                        warn!("Ошибка регистрации {:?}", e);
+                        c.mark_reset();
+                        reset_tokens.push(c.token);
+                    });
+            }
+        }
+
+        for token in reset_tokens {
+            match self.conns.remove(token) {
+                Some(_c) => {
+                    debug!("сброс соединения; token={:?}", token);
+                }
+                None => {
+                    warn!("Неудалось удалить соединение для {:?}", token);
+                }
+            }
+        }
+    }
+
     /// обработчик события
     fn ready(&mut self, poll: &mut Poll, token: Token, event: Ready) {
         debug!("токен {:?} событие = {:?}", token, event);
@@ -101,7 +132,7 @@ impl Server {
         }
 
         if event.is_hup() {
-            trace!("Событие обрыва соединения(Hup event for) токена {:?}", token);
+            trace!("Hup event for {:?}", token);
             self.find_connection_by_token(token).mark_reset();
             return;
         }
@@ -135,7 +166,6 @@ impl Server {
             if self.token == token {
                 self.accept(poll);
             } else {
-
                 if self.find_connection_by_token(token).is_reset() {
                     info!("{:?} соединение сброшено", token);
                     return;
@@ -154,4 +184,78 @@ impl Server {
         }
     }
 
+    /// Принять новое клиентское соединение.
+    ///
+    /// The server will keep track of the new connection and forward any events from the poller
+    /// to this connection.
+    /// Сервер будет отслеживать новое подключение и перенаправлять любые события из опроса
+    /// из данного подключения.
+    fn accept(&mut self, poll: &mut Poll) {
+        debug!("сервер принимает новый сокет");
+
+        loop {
+            // Отчет об ошибке, если нет сокета, иначе двигаемся дальше,
+            // поэтому мы не рушить весь сервер.
+            let sock = match self.sock.accept() {
+                Ok((sock, _)) => sock,
+                Err(e) => {
+                    if e.kind() == ErrorKind::WouldBlock {
+                        debug!("принять столкнулись с блокировкой");
+                    } else {
+                        error!("Сбой принятия нового сокета, {:?}", e);
+                    }
+                    return;
+                }
+            };
+
+            let token = match self.conns.vacant_entry() {
+                Some(entry) => {
+                    debug!("регистрация {:?} в опроснике", entry.index());
+                    let c = Connection::new(sock, entry.index());
+                    entry.insert(c).index()
+                }
+                None => {
+                    error!("Не удалось вставить соединение в Slab");
+                    return;
+                }
+            };
+
+            match self.find_connection_by_token(token).register(poll) {
+                Ok(_) => {},
+                Err(e) => {
+                    error!("Сбой регистрации {:?} соединения в опроснике событий, {:?}", token, e);
+                    self.conns.remove(token);
+                }
+            }
+        }
+    }
+
+    /// Перенаправление доступного события в установленное соединение.
+    ///
+    /// Connections are identified by the token provided to us from the poller.
+    /// Соединения определенных токенов, которые мы получили из опросника poller.
+    /// Once a read has finished, push the receive buffer into
+    /// the all the existing connections so we can broadcast.
+    fn readable(&mut self, token: Token) -> io::Result<()> {
+        debug!("сервер conn доступен; token={:?}", token);
+
+        while let Some(message) = try!(self.find_connection_by_token(token).readable()) {
+            let rc_message = Rc::new(message);
+            // Очередь записи для всех подключенных клиентов.
+            for c in self.conns.iter_mut() {
+                c.send_message(rc_message.clone())
+                    .unwrap_or_else(|e| {
+                        error!("Сбой записи сообщения в очередь {:?}: {:?}", c.token, e);
+                        c.mark_reset();
+                    });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Поиск соединения в Slab с помощью токена.
+    fn find_connection_by_token<'a>(&'a mut self, token: Token) -> &'a mut Connection {
+        &mut self.conns[token]
+    }
 }
