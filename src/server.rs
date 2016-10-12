@@ -236,6 +236,8 @@ impl Server {
     /// Соединения определенных токенов, которые мы получили из опросника poller.
     /// Once a read has finished, push the receive buffer into
     /// the all the existing connections so we can broadcast.
+    /// После чтения завершится, помещаем буфер приема на все существующие подключения,
+    /// чтобы мы могли транслировать.
     fn readable(&mut self, token: Token) -> io::Result<()> {
         debug!("сервер conn доступен; token={:?}", token);
 
