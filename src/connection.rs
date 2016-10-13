@@ -135,10 +135,22 @@ impl Connection {
 
         if bytes < 8 {
             warn!("Ошибка длины сообщения {} bytes", bytes);
+            println!("Ошибка длины сообщения {} bytes", bytes);
             return Err(Error::new(ErrorKind::InvalidData, "Недопустимая длина сообщения"));
         }
 
+        println!("Содержимое сообщения о длине {:?}", buf.as_ref());
         let msg_len = BigEndian::read_u64(buf.as_ref());
+        println!("Длина входящего сообщения {}", msg_len);
+
+
+        if msg_len > 1048576 {
+            warn!("Ошибка длины сообщения {} bytes", bytes);
+            println!("Ошибка длины сообщения {} bytes", bytes);
+            println!("Длина входящего сообщения {}", msg_len);
+            return Err(Error::new(ErrorKind::InvalidData, "Недопустимая длина сообщения"));
+        }
+
         Ok(Some(msg_len))
     }
 

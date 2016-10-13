@@ -47,24 +47,29 @@ impl Server {
         try!(self.register(poll));
 
         info!("Запуск сервера, запуск цикла...");
+        println!("Чат-сервер запущен.");
         loop {
+            //println!("run loop");
             let cnt = try!(poll.poll(&mut self.events, None));
 
             let mut i = 0;
 
             trace!("обработка событий... cnt={}; len={}", cnt, self.events.len());
+            //println!("обработка событий... cnt={}; len={}", cnt, self.events.len());
 
             // Перебираем уведомления.
             // Каждое из этих событий дает token для регистрации
             // (который обычно представляет собой, handle события),
             // а также информацию о том, какие события происходили (чтение, запись, сигнал, и т. д.)
             while i < cnt {
+                //println!("run while");
                 // TODO this would be nice if it would turn a Result type. trying to convert this
                 // into a io::Result runs into a problem because .ok_or() expects std::Result and
                 // not io::Result
                 let event = self.events.get(i).expect("Ошибка получения события");
 
                 trace!("event={:?}; idx={:?}", event, i);
+                //println!("event={:?}; idx={:?}", event, i);
                 self.ready(poll, event.token(), event.kind());
 
                 i += 1;
@@ -86,6 +91,7 @@ impl Server {
             PollOpt::edge()
         ).or_else(|e| {
             error!("Ошибка регистрации опросника событий {:?}, {:?}", self.token, e);
+            //println!("Ошибка регистрации опросника событий {:?}, {:?}", self.token, e);
             Err(e)
         })
     }
@@ -93,16 +99,20 @@ impl Server {
     // конечный такт бесконечного цикла
     fn tick(&mut self, poll: &mut Poll) {
         trace!("register tick");
+        //println!("register tick");
 
         let mut reset_tokens = Vec::new();
 
         for c in self.conns.iter_mut() {
             if c.is_reset() {
+                //println!("register tick 2");
                 reset_tokens.push(c.token);
+                //println!("register tick 3");
             } else if c.is_idle() {
                 c.reregister(poll)
                     .unwrap_or_else(|e| {
                         warn!("Ошибка регистрации {:?}", e);
+                        //println!("Ошибка регистрации {:?}", e);
                         c.mark_reset();
                         reset_tokens.push(c.token);
                     });
@@ -113,9 +123,11 @@ impl Server {
             match self.conns.remove(token) {
                 Some(_c) => {
                     debug!("сброс соединения; token={:?}", token);
+                    //println!("сброс соединения; token={:?}", token);
                 }
                 None => {
                     warn!("Неудалось удалить соединение для {:?}", token);
+                    //println!("Неудалось удалить соединение для {:?}", token);
                 }
             }
         }
@@ -124,15 +136,18 @@ impl Server {
     /// обработчик события
     fn ready(&mut self, poll: &mut Poll, token: Token, event: Ready) {
         debug!("токен {:?} событие = {:?}", token, event);
+        //println!("токен {:?} событие = {:?}", token, event);
 
         if event.is_error() {
             warn!("Ошибка события токена{:?}", token);
+            //println!("Ошибка события токена{:?}", token);
             self.find_connection_by_token(token).mark_reset(); // пометить на сброс соединения
             return;
         }
 
         if event.is_hup() {
             trace!("Hup event for {:?}", token);
+            //println!("Hup event for {:?}", token);
             self.find_connection_by_token(token).mark_reset();
             return;
         }
@@ -141,6 +156,7 @@ impl Server {
         // Запись события для прочих токенов, должны передаваться этому подключению.
         if event.is_writable() {
             trace!("Записываем событие для токена {:?}", token);
+            //println!("Записываем событие для токена {:?}", token);
             assert!(self.token != token, "Получение записанного события для Сервера");
 
             let conn = self.find_connection_by_token(token);
