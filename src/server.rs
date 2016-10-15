@@ -208,6 +208,7 @@ impl Server {
     /// из данного подключения.
     fn accept(&mut self, poll: &mut Poll) {
         debug!("сервер принимает новый сокет");
+        println!("сервер принимает новое подключение");
 
         loop {
             // Отчет об ошибке, если нет сокета, иначе двигаемся дальше,
@@ -273,7 +274,8 @@ impl Server {
     }
 
     /// Поиск соединения в Slab с помощью токена.
-    fn find_connection_by_token<'a>(&'a mut self, token: Token) -> &'a mut Connection {
+    //fn find_connection_by_token<'a>(&'a mut self, token: Token) -> &'a mut Connection {
+    fn find_connection_by_token(&mut self, token: Token) -> &mut Connection {
         &mut self.conns[token]
     }
 }

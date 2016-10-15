@@ -2,6 +2,7 @@ use std::io;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
 use std::rc::Rc;
+use std::str;
 
 use byteorder::{ByteOrder, BigEndian};
 
@@ -87,14 +88,39 @@ impl Connection {
         match sock_ref.take(msg_len as u64).read(&mut recv_buf) {
             Ok(n) => {
                 debug!("CONN : считано {} байт", n);
+                let mut recv2_buf: Vec<u8> = Vec::with_capacity(msg_len);
+                let s = str::from_utf8(&recv_buf[..]).unwrap();
+                let data = s.trim();
+                let data: Vec<&str> = data.splitn(2, ' ').collect();
+                match data[0] {
+                    "chat" => {
+                        println!("recv>{}", s);
+                        let cmsg: &str = "chat_all";
+                        //let msg: &str = data[1];
+                        let smsg: String = format!("{} {}", cmsg, data[1]);
+                        let smsg_len = smsg.len();
+                        recv2_buf = Vec::with_capacity(smsg_len);
+                        unsafe { recv2_buf.set_len(smsg_len); }
+                        recv2_buf = smsg.into_bytes();
+                    },
+                    "ping" => {
+                        //let smsg: String = format!("{}", s);
+                        let smsg: String = s.to_string();
+                        let smsg_len = smsg.len();
+                        recv2_buf = Vec::with_capacity(smsg_len);
+                        unsafe { recv2_buf.set_len(smsg_len); }
+                        recv2_buf = smsg.into_bytes();
+                    },
+                    _ => (),
+                }
 
                 if n < msg_len as usize {
                     return Err(Error::new(ErrorKind::InvalidData, "Не осилил достаточно байт"));
                 }
 
                 self.read_continuation = None;
-
-                Ok(Some(recv_buf.to_vec()))
+                //println!("Всем> {}", recv_buf);
+                Ok(Some(recv2_buf.to_vec()))
             }
             Err(e) => {
                 if e.kind() == ErrorKind::WouldBlock {
@@ -123,7 +149,11 @@ impl Connection {
         let mut buf = [0u8; 8];
 
         let bytes = match self.sock.read(&mut buf) {
-            Ok(n) => n,
+            Ok(n) => {
+                //let s = str::from_utf8(&buf[..]).unwrap();
+                //println!("Содержимое длины сообщения:{}, количество считанных байт:{}", s, n);
+                n
+            },
             Err(e) => {
                 if e.kind() == ErrorKind::WouldBlock {
                     return Ok(None);
@@ -139,9 +169,8 @@ impl Connection {
             return Err(Error::new(ErrorKind::InvalidData, "Недопустимая длина сообщения"));
         }
 
-        println!("Содержимое сообщения о длине {:?}", buf.as_ref());
+        //println!("Содержимое сообщения о длине {:?}", buf.as_ref());
         let msg_len = BigEndian::read_u64(buf.as_ref());
-        println!("Длина входящего сообщения {}", msg_len);
 
 
         if msg_len > 1048576 {
@@ -173,6 +202,13 @@ impl Connection {
                         return Ok(());
                     },
                     Ok(Some(())) => {
+                        let s = str::from_utf8(&buf[..]).unwrap();
+                        let len = s.len();
+                        if len > 0 {
+                            if s != "ping" {
+                                println!("send>{}", s);
+                            }
+                        };
                         ()
                     },
                     Err(e) => {
