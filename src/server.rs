@@ -136,7 +136,7 @@ impl Server {
     /// обработчик события
     fn ready(&mut self, poll: &mut Poll, token: Token, event: Ready) {
         debug!("токен {:?} событие = {:?}", token, event);
-        println!("Обрабработчик/ Токен {:?} Событие = {:?}", token, event);
+        //println!("Обрабработчик/ Токен {:?} Событие = {:?}", token, event);
 
         if event.is_error() {
             warn!("Ошибка события токена{:?}", token);
@@ -156,7 +156,7 @@ impl Server {
         // Запись события для прочих токенов, должны передаваться этому подключению.
         if event.is_writable() {
             trace!("Записываем событие для токена {:?}", token);
-            println!("Обрабработчик/ Записываем событие для токена {:?}", token);
+            //println!("Обрабработчик/ Записываем событие для токена {:?}", token);
             assert!(self.token != token, "Получение записанного события для Сервера");
 
             let conn = self.find_connection_by_token(token);
@@ -181,7 +181,7 @@ impl Server {
         // Событие чтения для любого другого токена должны быть передан этому соединению.
         if event.is_readable() {
             trace!("Читаем событие для токена {:?}", token);
-            println!("Обрабработчик/ Читаем событие для токена {:?}", token);
+            //println!("Обрабработчик/ Читаем событие для токена {:?}", token);
             // если токен принадлежит серверу self, то идем принимать новое соединение
             if self.token == token {
                 self.accept(poll);
