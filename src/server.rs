@@ -136,18 +136,18 @@ impl Server {
     /// обработчик события
     fn ready(&mut self, poll: &mut Poll, token: Token, event: Ready) {
         debug!("токен {:?} событие = {:?}", token, event);
-        //println!("токен {:?} событие = {:?}", token, event);
+        println!("Обрабработчик/ Токен {:?} Событие = {:?}", token, event);
 
         if event.is_error() {
             warn!("Ошибка события токена{:?}", token);
-            //println!("Ошибка события токена{:?}", token);
+            println!("Обрабработчик/ Ошибка события токена{:?}", token);
             self.find_connection_by_token(token).mark_reset(); // пометить на сброс соединения
             return;
         }
 
         if event.is_hup() {
             trace!("Hup event for {:?}", token);
-            //println!("Hup event for {:?}", token);
+            println!("Обрабработчик/ Клиент отвалился(Hup event for) {:?}", token);
             self.find_connection_by_token(token).mark_reset();
             return;
         }
@@ -156,19 +156,21 @@ impl Server {
         // Запись события для прочих токенов, должны передаваться этому подключению.
         if event.is_writable() {
             trace!("Записываем событие для токена {:?}", token);
-            //println!("Записываем событие для токена {:?}", token);
+            println!("Обрабработчик/ Записываем событие для токена {:?}", token);
             assert!(self.token != token, "Получение записанного события для Сервера");
 
             let conn = self.find_connection_by_token(token);
 
             if conn.is_reset() {
                 info!("{:?} соединение сброшено", token);
+                println!("Обрабработчик/ {:?} соединение сброшено", token);
                 return;
             }
 
             conn.writable()
                 .unwrap_or_else(|e| {
                     warn!("Ошибка записи события для токена {:?}, {:?}", token, e);
+                    println!("Обрабработчик/ Ошибка записи события для токена {:?}, {:?}", token, e);
                     conn.mark_reset();
                 });
         }
@@ -179,17 +181,23 @@ impl Server {
         // Событие чтения для любого другого токена должны быть передан этому соединению.
         if event.is_readable() {
             trace!("Читаем событие для токена {:?}", token);
+            println!("Обрабработчик/ Читаем событие для токена {:?}", token);
+            // если токен принадлежит серверу self, то идем принимать новое соединение
             if self.token == token {
                 self.accept(poll);
             } else {
+                // тут проверяем соединение на наличие флага "сбросить"
                 if self.find_connection_by_token(token).is_reset() {
                     info!("{:?} соединение сброшено", token);
+                    println!("Обрабработчик/ {:?} соединение сброшено", token);
                     return;
                 }
 
+                // тут собственно рассылаем всем сообщение. т.е. тут readable(token) =)
                 self.readable(token)
                     .unwrap_or_else(|e| {
                         warn!("Ошибка чтения события для токена {:?}: {:?}", token, e);
+                        println!("Обрабработчик/ Ошибка чтения события для токена {:?}: {:?}", token, e);
                         self.find_connection_by_token(token).mark_reset();
                     });
             }
@@ -208,7 +216,7 @@ impl Server {
     /// из данного подключения.
     fn accept(&mut self, poll: &mut Poll) {
         debug!("сервер принимает новый сокет");
-        println!("сервер принимает новое подключение");
+        println!("accept/ Cервер принимает новое подключение");
 
         loop {
             // Отчет об ошибке, если нет сокета, иначе двигаемся дальше,
