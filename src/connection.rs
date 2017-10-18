@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 use std::rc::Rc;
 use std::str;
 
-use byteorder::{ByteOrder, BigEndian, LittleEndian};
+use byteorder::{ByteOrder, LittleEndian};
 
 use mio::*;
 use mio::tcp::*;
