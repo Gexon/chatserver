@@ -22,7 +22,7 @@ mod dbqury;
 
 
 fn main() {
-    let hname: &str = "0.0.0.0";
+    let hname: &str = "192.168.0.131";
     //let hname: &str = "194.87.237.144";
     let pname: &str = "6657";
 
